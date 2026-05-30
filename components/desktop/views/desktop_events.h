@@ -12,6 +12,8 @@ typedef enum {
     DesktopMainEventOpenMenu,
     DesktopMainEventOpenDebug,
     DesktopMainEventOpenPowerOff,
+    DesktopMainEventLockKeypad,
+    DesktopMainEventLockWithPin,
 
     DesktopDummyEventOpenLeft,
     DesktopDummyEventOpenDown,

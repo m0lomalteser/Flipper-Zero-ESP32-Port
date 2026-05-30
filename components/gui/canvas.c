@@ -1,6 +1,8 @@
 #include "canvas_i.h"
 #include "icon_animation_i.h"
 
+#include <momentum/asset_packs_i.h>
+#include <momentum/settings.h>
 #include <furi.h>
 #include <furi_hal.h>
 #include <stdint.h>
@@ -147,11 +149,22 @@ const CanvasFontParameters* canvas_get_font_params(const Canvas* canvas, Font fo
 
 void canvas_clear(Canvas* canvas) {
     furi_check(canvas);
-    u8g2_ClearBuffer(&canvas->fb);
+    if(momentum_settings.dark_mode) {
+        u8g2_FillBuffer(&canvas->fb);
+    } else {
+        u8g2_ClearBuffer(&canvas->fb);
+    }
 }
 
 void canvas_set_color(Canvas* canvas, Color color) {
     furi_check(canvas);
+    if(momentum_settings.dark_mode) {
+        if(color == ColorBlack) {
+            color = ColorWhite;
+        } else if(color == ColorWhite) {
+            color = ColorBlack;
+        }
+    }
     u8g2_SetDrawColor(&canvas->fb, color);
 }
 
@@ -161,12 +174,20 @@ void canvas_set_font_direction(Canvas* canvas, CanvasDirection dir) {
 }
 
 void canvas_invert_color(Canvas* canvas) {
-    canvas->fb.draw_color = !canvas->fb.draw_color;
+    if(canvas->fb.draw_color == ColorXOR && momentum_settings.dark_mode) {
+        canvas->fb.draw_color = ColorBlack;
+    } else {
+        canvas->fb.draw_color = !canvas->fb.draw_color;
+    }
 }
 
 void canvas_set_font(Canvas* canvas, Font font) {
     furi_check(canvas);
     u8g2_SetFontMode(&canvas->fb, 1);
+    if(asset_packs && asset_packs->fonts[font]) {
+        u8g2_SetFont(&canvas->fb, asset_packs->fonts[font]);
+        return;
+    }
     if(font == FontPrimary) {
         u8g2_SetFont(&canvas->fb, u8g2_font_helvB08_tr);
     } else if(font == FontSecondary) {
@@ -412,6 +433,7 @@ void canvas_draw_icon_ex(
 void canvas_draw_icon(Canvas* canvas, int32_t x, int32_t y, const Icon* icon) {
     furi_check(canvas);
     furi_check(icon);
+    icon = asset_packs_swap_icon(icon);
 
     x += canvas->offset_x;
     y += canvas->offset_y;
