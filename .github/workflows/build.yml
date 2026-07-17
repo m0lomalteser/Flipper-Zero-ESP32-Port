@@ -34,6 +34,12 @@ jobs:
             artifact_name: flipper-waveshare-c6-1.9
             chip: esp32c6
             flash_size: 8MB
+          - name: heltec_wifi_lora_32_v3
+            script_key: heltec_v3
+            build_dir: build_heltec_v3
+            artifact_name: flipper-heltec_v3
+            chip: esp32s3
+            flash_size: 8MB
 
     steps:
       - name: Checkout code
