@@ -119,9 +119,11 @@
 #define BOARD_PIN_MIC_DATA      UINT16_MAX
 #define BOARD_PIN_MIC_CLK       UINT16_MAX
 
-/* ---- Qwiic / External I2C (shared with display) ---- */
-#define BOARD_PIN_QWIIC_SDA     BOARD_LCD_I2C_SDA
-#define BOARD_PIN_QWIIC_SCL     BOARD_LCD_I2C_SCL
+/* ---- Qwiic / External I2C ---- */
+/* Heltec V3 has no Qwiic connector and no BQ25896/BQ27220 power ICs.
+ * Do NOT define BOARD_PIN_QWIIC_SDA/SCL — the display already uses the
+ * new-gen I2C driver on I2C_NUM_0; defining these would cause the power
+ * driver to install the legacy I2C driver on the same port → crash. */
 
 /* ---- Built-in LED ---- */
 #define BOARD_PIN_LED           35
