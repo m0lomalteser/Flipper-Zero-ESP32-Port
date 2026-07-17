@@ -2,7 +2,9 @@
  * @file furi_hal_display.c
  * Display HAL — board-driven configuration via boards/board.h
  *
- * Flipper GUI: 128x64 mono → aspect-fit scaled and centered on display
+ * Flipper GUI: 128x64 mono → display
+ * - SPI (ST7789): aspect-fit scaled RGB565 via DMA
+ * - I2C (SSD1306): direct 128x64 mono page buffer transfer
  */
 
 #include "furi_hal_display.h"
@@ -10,19 +12,36 @@
 #include "furi_hal_resources.h"
 #include "furi_hal_spi_bus.h"
 #include "boards/board.h"
+#include <u8g2_glue.h>
 
 #include <string.h>
 #include <esp_log.h>
 #include <esp_heap_caps.h>
 #include <esp_system.h>
 #include <driver/gpio.h>
+#include <freertos/semphr.h>
+
+#if !BOARD_HAS_SSD1306_I2C
 #include <driver/spi_master.h>
 #include <esp_lcd_panel_io.h>
 #include <esp_lcd_panel_vendor.h>
 #include <esp_lcd_panel_ops.h>
-#include <freertos/semphr.h>
+#endif
 
 static const char* TAG = "FuriHalDisplay";
+
+#if BOARD_HAS_SSD1306_I2C
+/* ---- SSD1306 I2C path ---- */
+/* The 128x64 mono framebuffer is sent directly to the OLED.
+ * No scaling, no color conversion — native resolution. */
+
+#define FB_WIDTH  128
+#define FB_HEIGHT 64
+
+static bool display_initialized = false;
+
+#else
+/* ---- SPI (ST7789) path ---- */
 
 /* Display dimensions from board config */
 #define LCD_H_RES BOARD_LCD_H_RES
@@ -81,7 +100,9 @@ static uint16_t* rgb565_buf = NULL; // STRIPE_HEIGHT lines only
 static SemaphoreHandle_t lcd_flush_done = NULL;
 static uint8_t x_scale_lut[SCALED_WIDTH];
 static uint8_t y_scale_lut[SCALED_HEIGHT];
+#endif /* BOARD_HAS_SSD1306_I2C */
 
+#if !BOARD_HAS_SSD1306_I2C
 static bool furi_hal_display_flush_done_callback(
     esp_lcd_panel_io_handle_t panel_io,
     esp_lcd_panel_io_event_data_t* edata,
@@ -157,9 +178,19 @@ static void display_paint_rect(
         furi_hal_display_wait_flush();
     }
 }
+#endif /* !BOARD_HAS_SSD1306_I2C */
 
 void furi_hal_display_init(void) {
     ESP_LOGI(TAG, "Initializing display for %s", BOARD_NAME);
+
+#if BOARD_HAS_SSD1306_I2C
+    /* SSD1306 OLED via I2C — the I2C bus is initialized by the u8g2 byte callback.
+     * We just need to do a hardware reset and let u8g2 handle init. */
+    ssd1306_hw_reset();
+    display_initialized = true;
+    ESP_LOGI(TAG, "SSD1306 I2C display ready (128x64)");
+#else
+    /* SPI (ST7789) path */
     furi_hal_spi_bus_init();
     if(!lcd_flush_done) {
         lcd_flush_done = xSemaphoreCreateBinary();
@@ -284,10 +315,25 @@ void furi_hal_display_init(void) {
 
     ESP_LOGI(TAG, "Display initialized (%dx%d, scaled %dx%d, stripe=%d lines, buf=%d bytes)",
              FB_WIDTH, FB_HEIGHT, SCALED_WIDTH, SCALED_HEIGHT, STRIPE_HEIGHT, (int)stripe_bytes);
+#endif /* BOARD_HAS_SSD1306_I2C */
 }
 
 void furi_hal_display_commit(const uint8_t* data, uint32_t size) {
     UNUSED(size);
+
+#if BOARD_HAS_SSD1306_I2C
+    if(!display_initialized || !data) return;
+    /* SSD1306: Send the 128x64 mono framebuffer directly.
+     * u8g2 tile format: 8 pages × 128 bytes = 1024 bytes.
+     * Page 0 = rows 0-7, Page 1 = rows 8-15, etc. */
+    ssd1306_i2c_send_cmd(0x21);  /* Column address */
+    ssd1306_i2c_send_cmd(0x00);
+    ssd1306_i2c_send_cmd(0x7F);
+    ssd1306_i2c_send_cmd(0x22);  /* Page address */
+    ssd1306_i2c_send_cmd(0x00);
+    ssd1306_i2c_send_cmd(0x07);
+    ssd1306_i2c_send_data(data, 1024);
+#else
     if(!panel_handle || !rgb565_buf || !data) return;
 
     /*
@@ -355,44 +401,76 @@ void furi_hal_display_commit(const uint8_t* data, uint32_t size) {
     }
 
     furi_hal_spi_bus_unlock();
+#endif /* BOARD_HAS_SSD1306_I2C */
 }
 
 void furi_hal_display_set_backlight(uint8_t brightness) {
+#if BOARD_HAS_SSD1306_I2C
+    /* SSD1306 OLED has no backlight — contrast control via u8g2 instead */
+    UNUSED(brightness);
+#else
     furi_hal_light_set(LightBacklight, brightness);
+#endif
 }
 
 void furi_hal_display_sleep(void) {
+#if BOARD_HAS_SSD1306_I2C
+    if(!display_initialized) return;
+    /* SSD1306: send display OFF command */
+    ssd1306_i2c_send_cmd(0xAE);
+#else
     if(!panel_handle) return;
     furi_hal_spi_bus_lock();
     /* SLPIN: stop the panel's internal oscillator/booster to cut idle current */
     esp_lcd_panel_disp_on_off(panel_handle, false);
     furi_hal_spi_bus_unlock();
+#endif
 }
 
 uint16_t furi_hal_display_get_h_res(void) {
-    return LCD_H_RES;
+    return BOARD_LCD_H_RES;
 }
 
 uint16_t furi_hal_display_get_v_res(void) {
-    return LCD_V_RES;
+    return BOARD_LCD_V_RES;
 }
 
 esp_lcd_panel_handle_t furi_hal_display_get_panel_handle(void) {
+#if BOARD_HAS_SSD1306_I2C
+    return NULL;  /* SSD1306 has no esp_lcd panel handle */
+#else
     return panel_handle;
+#endif
 }
 
 void furi_hal_display_set_fg_color(uint16_t color) {
+#if !BOARD_HAS_SSD1306_I2C
     fg_color = color;
+#else
+    UNUSED(color);
+#endif
 }
 
 uint16_t furi_hal_display_get_fg_color(void) {
+#if BOARD_HAS_SSD1306_I2C
+    return 0;
+#else
     return fg_color;
+#endif
 }
 
 void furi_hal_display_set_bg_color(uint16_t color) {
+#if !BOARD_HAS_SSD1306_I2C
     bg_color = color;
+#else
+    UNUSED(color);
+#endif
 }
 
 uint16_t furi_hal_display_get_bg_color(void) {
+#if BOARD_HAS_SSD1306_I2C
+    return 0;
+#else
     return bg_color;
+#endif
 }

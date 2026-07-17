@@ -1,0 +1,41 @@
+# Target-specific overrides for Heltec WiFi LoRa 32 V3 (ESP32-S3)
+# These are merged ON TOP OF sdkconfig.defaults when building with:
+#   idf.py -B build_heltec_v3 set-target esp32s3
+#   idf.py -B build_heltec_v3 -DFLIPPER_BOARD=heltec_wifi_lora_32_v3 build
+
+# Flash: Heltec V3 has 8MB
+CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="8MB"
+
+# Single-app partition table for 8 MB flash
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions_singleapp_large.csv"
+CONFIG_PARTITION_TABLE_FILENAME="partitions_singleapp_large.csv"
+
+# ESP32-S3 is dual-core Xtensa — keep unicore for Furi compatibility
+CONFIG_FREERTOS_UNICORE=y
+
+# BLE: Use legacy 4.2 advertising
+CONFIG_BT_BLE_42_FEATURES_SUPPORTED=y
+# CONFIG_BT_BLE_50_FEATURES_SUPPORTED is not set
+
+# TinyUSB (USB HID for BadUSB + CDC for RPC)
+CONFIG_TINYUSB_HID_COUNT=1
+CONFIG_TINYUSB_CDC_ENABLED=y
+CONFIG_TINYUSB_CDC_COUNT=1
+# MSC must stay enabled — tusb_config.h unconditionally references
+# CONFIG_TINYUSB_MSC_BUFSIZE which only exists when MSC is enabled.
+# The Heltec V3 has no SD card, so MSC is never activated at runtime.
+CONFIG_TINYUSB_MSC_ENABLED=y
+CONFIG_TINYUSB_MSC_BUFSIZE=512
+
+# I2C for SSD1306 display (400kHz)
+CONFIG_I2C_ENABLE_DEBUG_LOG=y
+
+# No PSRAM on Heltec V3 — disable all SPIRAM features inherited from
+# sdkconfig.defaults.esp32s3.  With FETCH_INSTRUCTIONS+RODATA enabled and no
+# physical PSRAM, the CPU crashes before app_main() (RTCWDT_RTC_RST boot loop).
+CONFIG_SPIRAM=n
+
+# Keep buffer sizes small
+CONFIG_LWIP_MAX_SOCKETS=8

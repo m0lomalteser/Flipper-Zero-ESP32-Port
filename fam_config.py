@@ -76,24 +76,28 @@ APPS = [
 
 # Boards without NFC / IR hardware – exclude the corresponding apps
 _board = os.environ.get("FLIPPER_BOARD", "")
-_boards_without_nfc = {"waveshare_c6_1.9", "waveshare_c6_1.47"}
-_boards_without_ir = {"waveshare_c6_1.9", "waveshare_c6_1.47"}
+_boards_without_nfc = {"waveshare_c6_1.9", "waveshare_c6_1.47", "heltec_wifi_lora_32_v3"}
+_boards_without_ir = {"waveshare_c6_1.9", "waveshare_c6_1.47", "heltec_wifi_lora_32_v3"}
 
 # Wolf3D shares Doom's requirements (PSRAM, ST7789 320xN, I2S speaker).
 # Doom läuft ebenfalls nur auf T-Embed (PSRAM + 16 MB Flash) — wird aber als
 # externer FAP gebaut (steht nicht in APPS), Block bleibt unten zur Klarheit.
-_boards_without_wolf3d = {"waveshare_c6_1.9", "waveshare_c6_1.47"}
+_boards_without_wolf3d = {"waveshare_c6_1.9", "waveshare_c6_1.47", "heltec_wifi_lora_32_v3"}
 
 if _board in _boards_without_nfc:
     APPS = [a for a in APPS if a != "nfc"]
 
 # waveshare_c6_1.9: external CC1101 module wired up (pins in board_waveshare_c6_1.9.h,
 # BOARD_HAS_SUBGHZ=1) → SubGHz built in. 1.47 has no module → stays excluded.
-_boards_without_subghz = {"waveshare_c6_1.47"}
+# Heltec V3 has SX1262 LoRa (not CC1101 SubGHz).
+_boards_without_subghz = {"waveshare_c6_1.47", "heltec_wifi_lora_32_v3"}
 
 # NRF24 plugs into the LORA slot (T-Embed CC1101). Boards without the slot
 # don't have the required pin defines.
-_boards_without_nrf24 = {"waveshare_c6_1.9", "waveshare_c6_1.47"}
+_boards_without_nrf24 = {"waveshare_c6_1.9", "waveshare_c6_1.47", "heltec_wifi_lora_32_v3"}
+
+# Boards without 125kHz RFID hardware
+_boards_without_lfrfid = {"waveshare_c6_1.9", "waveshare_c6_1.47", "heltec_wifi_lora_32_v3"}
 
 if _board in _boards_without_ir:
     APPS = [a for a in APPS if a not in ("infrared", "js_infrared")]
@@ -103,6 +107,9 @@ if _board in _boards_without_subghz:
 
 if _board in _boards_without_nrf24:
     APPS = [a for a in APPS if a != "nrf24"]
+
+if _board in _boards_without_lfrfid:
+    APPS = [a for a in APPS if a != "lfrfid"]
 
 # NOTE: cli_vcp and dolphin look like easy RAM wins (~4KB stack each) but both
 # are hard-wired into the desktop service: desktop.c calls cli_vcp_enable/disable

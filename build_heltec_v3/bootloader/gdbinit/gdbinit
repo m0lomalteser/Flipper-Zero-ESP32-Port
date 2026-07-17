@@ -1,0 +1,2 @@
+source /Users/marlin/Flipper-Zero-ESP32-Port/build_heltec_v3/bootloader/gdbinit/symbols
+source /Users/marlin/Flipper-Zero-ESP32-Port/build_heltec_v3/bootloader/gdbinit/connect

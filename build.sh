@@ -16,22 +16,25 @@ declare -A TARGETS=(
     ["esp32s3"]="esp32s3"
     ["waveshare_c6"]="esp32c6"
     ["t_embed"]="esp32s3"
+    ["heltec_v3"]="esp32s3"
 )
 declare -A NAMES=(
     ["esp32s3"]="esp32s3_generic"
     ["waveshare_c6"]="waveshare_c6_1.9"
     ["t_embed"]="lilygo_t_embed_cc1101"
+    ["heltec_v3"]="heltec_wifi_lora_32_v3"
 )
 declare -A DIRS=(
     ["esp32s3"]="build_s3"
     ["waveshare_c6"]="build_waveshare_c6"
     ["t_embed"]="build_t_embed"
+    ["heltec_v3"]="build_heltec_v3"
 )
 
 usage() {
     cat <<EOF
 Usage: $(basename "$0") --board <name> [options]
-Boards: esp32s3, waveshare_c6, t_embed
+Boards: esp32s3, waveshare_c6, t_embed, heltec_v3
 Options: -p|--port, -m|--monitor, --build-only
 EOF
 }
@@ -74,7 +77,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "${SELECTED_BOARD}" || -z "${NAMES[$SELECTED_BOARD]+x}" ]]; then
-    echo "Error: Valid --board required (esp32s3, waveshare_c6, t_embed)." >&2
+    echo "Error: Valid --board required (esp32s3, waveshare_c6, t_embed, heltec_v3)." >&2
     exit 1
 fi
 
@@ -122,6 +125,12 @@ idf.py -B "${BUILD_DIR}" set-target "${TARGET}"
 # Construct command
 COMMANDS=("reconfigure" "build")
 PY_OPTS=("-B" "${BUILD_DIR}" "-DFLIPPER_BOARD=${BOARD}")
+
+# Board-specific sdkconfig overlays (merged on top of sdkconfig.defaults + sdkconfig.defaults.<target>)
+BOARD_SDKCONFIG="sdkconfig.defaults.${SELECTED_BOARD}"
+if [[ -f "${SCRIPT_DIR}/${BOARD_SDKCONFIG}" ]]; then
+    PY_OPTS+=("-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.defaults.${TARGET};${BOARD_SDKCONFIG}")
+fi
 
 if [[ "${BUILD_ONLY}" -eq 0 ]]; then
     COMMANDS+=("flash")

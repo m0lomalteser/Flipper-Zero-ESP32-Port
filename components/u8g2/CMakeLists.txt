@@ -13,6 +13,7 @@ idf_component_register(
         "u8g2_line.c"
         "u8g2_ll_hvline.c"
         "u8g2_setup.c"
+        "u8g2_ssd1306_i2c.c"
         "u8x8_8x8.c"
         "u8x8_byte.c"
         "u8x8_cad.c"
@@ -20,5 +21,5 @@ idf_component_register(
         "u8x8_gpio.c"
         "u8x8_setup.c"
     INCLUDE_DIRS "."
-    REQUIRES furi
+    REQUIRES furi driver
 )
